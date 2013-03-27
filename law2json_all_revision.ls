@@ -49,33 +49,60 @@ parseHTML = (lawdir) ->
         console.log "Process #lawdir/#file"
         html = fs.readFileSync "#lawdir/#file"
 
-        var name, law_no, ver, article, paragraph
+        var name, lyID, ver, article, paragraph, subparagraph, item
 
         for line in html / '\n'
             match line
             | /法編號:(\d+)\s+版本:(\d+)/
-                law_no = that.1
+                lyID = that.1
                 ver = that.2
+                law.lyID = lyID
             | /<FONT COLOR=blue SIZE=5>([^(]+)/
                 name = that.1
+                law.name = name
             | /<font color=8000ff>第(.*)條(?:之(.*))?/
                 major = that.1
                 minor = that.3
 
                 major = parseZHNumber major
-                minor = if minor then parseZHNumber minor else void
+                minor = if minor => parseZHNumber minor else void
 
-                article = if minor then "#{major}-#{minor}" else "#{major}"
-                paragraph = 1
+                # Accident hit some sentenance else
+                if not major
+                    break
+
+                article = if minor => "#{major}-#{minor}" else "#{major}"
+                paragraph = 0
 
                 law.article["#article"] =
                     paragraph: {}
 
-            | /^\u3000{2}(.*)<br>\u000d$/
-                # http://law.moj.gov.tw/LawClass/LawSearchNo.aspx?PC=A0030133&DF=&SNo=8,9
-                law.article["#article"].paragraph["#paragraph"] =
+            # http://law.moj.gov.tw/LawClass/LawSearchNo.aspx?PC=A0030133&DF=&SNo=8,9
+
+            | /^(　　（([一二三四五六七八九十]+).*)<br>/
+                item = parseZHNumber that.2
+                law.article["#article"].paragraph["#paragraph"].subparagraph["#subparagraph"].item["#item"] =
                     content: that.1
+
+            | /^(　　([一二三四五六七八九十]+)、.*)<br>/
+                subparagraph = parseZHNumber that.2
+                law.article["#article"].paragraph["#paragraph"].subparagraph["#subparagraph"] =
+                        item:
+                            \0 :
+                                content: that.1
+
+            | /^(　　.*)<br>/
                 ++paragraph
+
+                law.article["#article"] =
+                    paragraph:
+                        "#paragraph":
+                            subparagraph:
+                                \0 :
+                                    item:
+                                        \0 :
+                                            content: that.1
+
     law
 
 {outdir} = optimist.argv
