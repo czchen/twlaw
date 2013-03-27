@@ -93,15 +93,12 @@ parseHTML = (lawdir) ->
 
             | /^(　　.*)<br>/
                 ++paragraph
-
-                law.article["#article"] =
-                    paragraph:
-                        "#paragraph":
-                            subparagraph:
+                law.article["#article"].paragraph["#paragraph"] =
+                    subparagraph:
+                        \0 :
+                            item:
                                 \0 :
-                                    item:
-                                        \0 :
-                                            content: that.1
+                                    content: that.1
 
     law
 
