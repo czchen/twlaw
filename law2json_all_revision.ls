@@ -41,25 +41,27 @@ objToSortedArray = (obj) ->
     return x
 
 parseHTML = (lawdir) ->
-    law =
-        article: {}
+    statute = {
+        name: []
+    }
+    article = []
+
     for file in fs.readdirSync lawdir
         if /\d+\.htm/ != file
             continue
         console.log "Process #lawdir/#file"
         html = fs.readFileSync "#lawdir/#file"
 
-        var name, lyID, ver, article, paragraph, subparagraph, item
+        var name, lyID, ver, num, paragraph, subparagraph, item
 
         for line in html / '\n'
             match line
             | /法編號:(\d+)\s+版本:(\d+)/
                 lyID = that.1
                 ver = that.2
-                law.lyID = lyID
+                statute.lyID = lyID
             | /<FONT COLOR=blue SIZE=5>([^(]+)/
                 name = that.1
-                law.name = name
             | /<font color=8000ff>第(.*)條(?:之(.*))?/
                 major = that.1
                 minor = that.3
@@ -71,36 +73,26 @@ parseHTML = (lawdir) ->
                 if not major
                     break
 
-                article = if minor => "#{major}-#{minor}" else "#{major}"
+                num = if minor => "#{major}-#{minor}" else "#{major}"
                 paragraph = 0
 
-                law.article["#article"] =
-                    paragraph: {}
+                current_article =
+                    article: num
+                    lyID: statute.lyID
+                    pass_date: \1946-12-25
+                    enactment_date: \1947-01-01
+                    enforcement_date: \1947-12-25
+                    content: ""
+
+                article.push current_article
 
             # http://law.moj.gov.tw/LawClass/LawSearchNo.aspx?PC=A0030133&DF=&SNo=8,9
+            | /^　　(.*)<br>/ # paragraph
+           # | /^　　(（([一二三四五六七八九十]+).*)<br>/ # subparagraph
+           # | /^　　(([一二三四五六七八九十]+)、.*)<br>/ # item
+                current_article.content = current_article.content + that.1 + "\n"
 
-            | /^(　　（([一二三四五六七八九十]+).*)<br>/
-                item = parseZHNumber that.2
-                law.article["#article"].paragraph["#paragraph"].subparagraph["#subparagraph"].item["#item"] =
-                    content: that.1
-
-            | /^(　　([一二三四五六七八九十]+)、.*)<br>/
-                subparagraph = parseZHNumber that.2
-                law.article["#article"].paragraph["#paragraph"].subparagraph["#subparagraph"] =
-                        item:
-                            \0 :
-                                content: that.1
-
-            | /^(　　.*)<br>/
-                ++paragraph
-                law.article["#article"].paragraph["#paragraph"] =
-                    subparagraph:
-                        \0 :
-                            item:
-                                \0 :
-                                    content: that.1
-
-    law
+        return { statute: statute, article: article }
 
 {outdir} = optimist.argv
 for lawdir in optimist.argv._
@@ -109,7 +101,12 @@ for lawdir in optimist.argv._
         dir = "#outdir/#{m.1}"
 
         mkdirp.sync dir
-        law = parseHTML lawdir
-        fs.writeFileSync "#dir/law.json", JSON.stringify law, '', 4
+        res = parseHTML lawdir
+
+        console.log "Write output to #dir/statute.json"
+        fs.writeFileSync "#dir/statute.json", JSON.stringify res.statute, '', 4
+
+        console.log "Write output to #dir/article.json"
+        fs.writeFileSync "#dir/article.json", JSON.stringify res.article, '', 4
     catch
         console.error "ERROR: #lawdir (#e)"
